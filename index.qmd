@@ -1,0 +1,13 @@
+---
+title: "Shengzi Guo(Godwin)"
+image: "files/profile_pic.jpg"
+about:
+  template: jolla
+  links:
+    - icon: envelope
+      href: mailto:shg053@ucsd.edu
+    - icon: linkedin
+      href: https://www.linkedin.com/feed/
+---
+
+Welcome to my website!
