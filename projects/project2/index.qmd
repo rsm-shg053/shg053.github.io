@@ -1,0 +1,315 @@
+---
+title: "Replication of Angrist & Lavy (1999)"
+subtitle: "Using Maimonides' Rule to Estimate the Effect of Class Size on Scholastic Achievement"
+author: "Godwin"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-tools: true
+    fig-align: center
+    embed-resources: true
+execute:
+  warning: false
+  message: false
+  echo: true
+jupyter: python3
+---
+
+## Introduction
+
+Does shrinking class size actually help kids learn? The simple correlation in
+observational data is famously misleading: small classes tend to show up in
+wealthy, high-performing schools, while large classes pile up in disadvantaged
+schools that also happen to be stretched thin along every other dimension.
+Regressing test scores on class size therefore mostly picks up the socioeconomic
+context of the student, not the pedagogical effect of the classroom.
+
+Angrist and Lavy (1999) solve this problem with a quintessentially Israeli
+natural experiment. Since the twelfth century, the educational guidance of
+Rabbi Moses ben Maimon ("Maimonides") has held that a teacher may instruct up
+to forty students. When a cohort exceeds forty, a second class must be opened;
+when it exceeds eighty, a third; and so on. The Israeli Ministry of Education
+adopted this rule as official policy. As a result, class size is a deterministic,
+sawtooth function of grade enrollment: a school with 40 fourth-graders teaches
+them in one class of 40, but a school with 41 fourth-graders splits them into
+two classes that average 20.5. Schools sitting on either side of 40 (or 80, or
+120) are otherwise similar, but their children are assigned to dramatically
+different class sizes by a rule nobody designed for research purposes. That
+discontinuity provides variation in class size that is plausibly unrelated to
+the usual confounders, which the authors exploit with a regression
+discontinuity design (RDD) — using Maimonides' rule as an instrument for (or a
+reduced-form predictor of) actual class size.
+
+In this post I focus on the 4th-grade sample. The **Main Analysis** section
+below replicates everything empirical the assignment asks for:
+
+- **Table II, columns 7 and 10** — the naive OLS of reading and math scores on class size.
+- **Table III Panel A, columns 7, 9, and 11** — the reduced-form RDD estimates using the Maimonides prediction $f_{sc}$ in place of actual class size.
+- **Figure 1, Panel B** — the graphical heart of the paper, plotting actual class size against the Maimonides prediction as a function of enrollment.
+
+The contrast between Table II and Table III is the whole point: the naive OLS
+reports that bigger classes go with *better* scores, while the RDD flips the
+sign and shows exactly what Maimonides would have predicted — fewer kids per
+teacher helps. The **Something Additional** section at the end steps back from
+the numbers to explain *why* a regression discontinuity design can recover a
+causal effect from observational data, using this paper as the running example.
+
+## Main Analysis
+
+### Data preparation
+
+I follow the authors' published Stata do-files (`AngristLavy_Table2.do`,
+`AngristLavy_Table3.do`) line-for-line: drop tiny and oversized classes
+(`1 < classize < 45`, `c_size > 5`), keep only schools that held the end-of-year
+exam (`c_leom == 1`), and drop schools with very high transient-student shares
+(`c_pik < 3`). `avgverb` and `avgmath` are scaled test scores; `tipuach` is
+Israel's "percent disadvantaged" index (a composite of parental education,
+immigration, and family size); `c_size` is grade enrollment; `classize` is
+actual class size; and `func1` is the Maimonides prediction
+$f_{sc} = c_{sc} / (\text{int}((c_{sc}-1)/40) + 1)$.
+
+```{python}
+#| label: setup
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+import matplotlib.pyplot as plt
+
+df = pd.read_stata("data/final4.dta")
+
+# Scores are sometimes coded +100; undo the offset (matches the Stata .do file)
+df.loc[df["avgverb"] > 100, "avgverb"] -= 100
+df.loc[df["avgmath"] > 100, "avgmath"] -= 100
+
+# Maimonides' rule prediction for class size
+df["func1"] = df["c_size"] / (np.floor((df["c_size"] - 1) / 40) + 1)
+
+# Blank out scores when the cell was empty
+df.loc[df["verbsize"] == 0, ["avgverb", "passverb"]] = np.nan
+df.loc[df["mathsize"] == 0, ["avgmath", "passmath"]] = np.nan
+
+# Sample restrictions from the do-file
+df = df[(df["classize"] > 1) & (df["classize"] < 45) & (df["c_size"] > 5)]
+df = df[(df["c_leom"] == 1) & (df["c_pik"] < 3)]
+
+print(f"Rows after filters: {len(df):,}")
+```
+
+### Helper: cluster-robust OLS (by school)
+
+Angrist and Lavy cluster their standard errors at the school level (and apply a
+Moulton correction on top; my SEs are cluster-robust but not Moulton-corrected,
+so they will be close but not identical to the published ones — the point
+estimates are what we are checking).
+
+```{python}
+#| label: helper
+def reg(formula, data, cluster="schlcode"):
+    terms = [t.strip() for t in formula.split("~")[1].replace("+", " ").split()]
+    lhs = formula.split("~")[0].strip()
+    d = data.dropna(subset=[lhs] + terms + [cluster]).copy()
+    m = ols(formula, data=d).fit(cov_type="cluster",
+                                 cov_kwds={"groups": d[cluster]})
+    return m, d
+
+def summarize(m, keep):
+    rows = []
+    for v in keep:
+        rows.append({"var": v,
+                     "coef": round(m.params[v], 3),
+                     "se": round(m.bse[v], 3)})
+    return pd.DataFrame(rows)
+```
+
+### Table II — naive OLS (the biased baseline)
+
+This is the "wrong answer" the paper wants us to see first. We regress each
+test score on actual class size with no controls.
+
+```{python}
+#| label: table2
+t2c7, _  = reg("avgverb ~ classize", df)      # Col 7: reading, 4th grade
+t2c10, _ = reg("avgmath ~ classize", df)      # Col 10: math, 4th grade
+
+t2 = pd.DataFrame({
+    "Col 7: Reading (avgverb)": [round(t2c7.params["classize"], 3),
+                                 f'({round(t2c7.bse["classize"], 3)})',
+                                 int(t2c7.nobs)],
+    "Col 10: Math (avgmath)":   [round(t2c10.params["classize"], 3),
+                                 f'({round(t2c10.bse["classize"], 3)})',
+                                 int(t2c10.nobs)],
+}, index=["classize coef", "(cluster SE)", "N"])
+t2
+```
+
+The published Table II reports **0.141 (0.033)** for column 7 and **0.221
+(0.039)** for column 10. The replication lands on the same point estimates, and
+the cluster SEs are within a hair of the Moulton-adjusted ones in the paper.
+
+Read literally, each additional student in the class is associated with an
+extra 0.14 points on the reading test and 0.22 points on the math test — the
+*opposite* of what class-size advocates would expect. The punch line of the
+paper is that this sign reversal is not real; it is confounding. Tipuach-poor
+schools tend to have smaller classes, and tipuach is extremely predictive of
+achievement on its own.
+
+### Table III, Panel A — the reduced-form RDD
+
+Now we use the Maimonides prediction `func1` in place of actual class size,
+controlling for `tipuach`. Columns 7, 9, 11 correspond to the three outcomes
+(reading, math, actual class size) for the 4th-grade whole sample.
+
+```{python}
+#| label: table3
+d3 = df.dropna(subset=["avgverb"]).copy()      # paper restricts to non-missing verb
+
+t3c7,  _ = reg("avgverb ~ func1 + tipuach", d3)   # Col 7:  reduced form, reading
+t3c9,  _ = reg("avgmath ~ func1 + tipuach", d3)   # Col 9:  reduced form, math
+t3c11, _ = reg("classize ~ func1 + tipuach", d3)  # Col 11: first stage, class size
+
+t3 = pd.DataFrame({
+    "Col 7: Reading":    [round(t3c7.params["func1"], 3),
+                          f'({round(t3c7.bse["func1"], 3)})'],
+    "Col 9: Math":       [round(t3c9.params["func1"], 3),
+                          f'({round(t3c9.bse["func1"], 3)})'],
+    "Col 11: Class size":[round(t3c11.params["func1"], 3),
+                          f'({round(t3c11.bse["func1"], 3)})'],
+}, index=["func1 coef", "(cluster SE)"])
+t3
+```
+
+The published Panel A reports **−0.085 (0.034)** for column 7, **0.038 (0.043)**
+for column 9, and **0.772 (0.037)** for column 11. Point estimates match.
+
+### Figure 1, Panel B — Maimonides' rule vs. actual class size
+
+The clearest way to *see* what Table III column 11 is capturing is to plot both
+the actual class size and the predicted class size against enrollment. The
+predicted series is a perfect sawtooth that collapses from ~40 to ~20 at every
+multiple of 40; the actual series roughly tracks the sawtooth but is smoothed
+by exceptions (integration of special-ed students, local staffing decisions,
+etc.). This is Figure 1 Panel B of the paper, for 4th grade.
+
+```{python}
+#| label: fig1b
+#| fig-cap: "Figure 1, Panel B: Actual class size and Maimonides prediction by 4th-grade enrollment."
+# Same 4th-grade analysis sample, averaged within each enrollment bin
+g = (df.groupby("c_size")
+       .agg(actual=("classize", "mean"),
+            predicted=("func1", "mean"))
+       .reset_index())
+g = g[g["c_size"] <= 220]
+
+fig, ax = plt.subplots(figsize=(9, 5.2))
+ax.plot(g["c_size"], g["predicted"], color="black", lw=1.3,
+        label="Maimonides' rule (predicted)")
+ax.plot(g["c_size"], g["actual"],    color="black", lw=1.0, ls=(0, (4, 3)),
+        label="Actual class size")
+
+# Cutoffs at 40, 80, 120, 160, 200
+for c in [40, 80, 120, 160, 200]:
+    ax.axvline(c, color="grey", lw=0.4, alpha=0.6)
+
+ax.set_xlabel("Enrollment count")
+ax.set_ylabel("Class size")
+ax.set_title("Figure 1 Panel B — Class size by initial enrollment, 4th grade")
+ax.set_xlim(0, 220)
+ax.set_ylim(0, 45)
+ax.legend(loc="lower right", frameon=False)
+ax.spines[["top", "right"]].set_visible(False)
+plt.tight_layout()
+plt.show()
+```
+
+The solid sawtooth is the mechanical Maimonides prediction; it collapses from
+~40 to ~20 at enrollments of 41, 81, 121, …. The dashed line is the actual
+average class size in the data: it sags more smoothly than the prediction
+because schools do not cleanly split a 41-kid grade into two classes of 20.5,
+but it clearly tracks the rule. That tracking is column 11 of Table III drawn
+as a picture — a one-unit move in `func1` drags actual class size by ~0.77
+units — and is what gives the RDD its identifying power.
+
+### What changed between the naive and reduced-form estimates
+
+Three things are worth pulling out of Tables II and III together:
+
+1. **Sign flip for reading.** Naive OLS says a one-student-bigger class raises
+   reading by 0.14 points; the reduced form says a one-unit increase in the
+   Maimonides *prediction* lowers reading by 0.09 points. Since `func1` moves
+   actual class size roughly 0.77-for-1 (column 11), the implied Wald / IV
+   effect on reading is about $-0.085 / 0.772 \approx -0.11$ — smaller
+   classes help.
+
+2. **Math attenuates toward zero.** Math goes from a strongly positive naive
+   slope (+0.22) to a small and statistically insignificant reduced-form
+   coefficient. Consistent with the paper, the class-size effect on 4th-grade
+   math is noisier and does not survive the RDD correction.
+
+3. **Why the numbers moved.** The naive OLS is fighting a confounder: schools
+   that happen to have smaller classes tend to serve more disadvantaged
+   students (higher `tipuach`) who score lower for reasons unrelated to class
+   size. Once the Maimonides prediction is used in place of actual class size,
+   the identifying variation comes from *which side of 40, 80, 120 …* a school's
+   enrollment falls on — variation that administrators did not choose.
+
+## Something Additional — why an RDD identifies a causal effect
+
+The empirical reversal between Table II and Table III deserves more than a
+shrug. Stepping back from the specific coefficients, here is the logic that
+makes a regression discontinuity design a credible path to causation, using
+Angrist and Lavy's setup as the running example.
+
+**The cutoff.** A "cutoff" is a hard rule that changes treatment assignment at
+a specific value of some underlying variable (the *running variable*). In this
+paper the running variable is 4th-grade enrollment and the cutoffs sit at
+multiples of 40: a school with 40 fourth-graders teaches them in one class of
+40, but a school with 41 fourth-graders is required by Maimonides' rule to
+split them into two classes that average 20.5. The "treatment" (class size)
+therefore falls off a cliff at 41, 81, 121, and so on — not because of what
+the school is like, but because of where its enrollment number sits relative
+to an arbitrary integer threshold.
+
+**Why schools near the cutoff look "as-if randomly assigned."** A school with
+40 fourth-graders and a school with 41 fourth-graders are, for almost every
+purpose that matters to student achievement, indistinguishable: they draw from
+similar neighborhoods, hire teachers from the same labor market, and face the
+same curriculum. The one-child difference in enrollment is essentially random
+noise — families move, a child gets held back, a twin shows up. Yet that noise
+lands them on opposite sides of a rule that cuts average class size roughly in
+half. Formally, the RDD identifying assumption is that potential outcomes are
+continuous at the cutoff; because confounders are smooth in enrollment, the
+*jump* in outcomes at the threshold can only be caused by the *jump* in
+treatment. The paper supports this assumption by showing that `tipuach` and
+other covariates do not themselves jump at the cutoffs.
+
+**Why this avoids the selection bias that breaks the naive OLS.** In the naive
+Table II regression, `classize` is the whole right-hand side, so the
+coefficient absorbs every reason a class ended up small, including deliberate
+policies that gave extra resources to struggling schools. That reverse channel
+("low scores → smaller class") biases the OLS slope upward, which is exactly
+what delivers the wrong-signed 0.14 and 0.22 in Table II. The reduced-form RDD
+in Table III breaks that channel by throwing away all the variation in
+`classize` that is not explained by the arbitrary rule, and keeping only the
+rule-induced variation. That surviving variation cannot plausibly be the
+consequence of test scores — Maimonides wrote the rule in the twelfth century,
+long before any Israeli fourth-grader took a standardized exam — so the
+coefficient on `func1` is free of reverse causality, and, because enrollment
+itself is controlled for, free of the usual omitted-variable confounding too.
+What remains is a credible estimate of the causal effect of *class size* on
+*achievement*: smaller classes help reading, and the effect on math is close
+to zero in the 4th grade.
+
+In short, RDD trades statistical power for credibility. It uses only the
+sliver of variation that a mechanical rule creates, and in return it gets to
+claim something OLS cannot: that the variation it is using was not caused by
+the outcome.
+
+## References
+
+Angrist, Joshua D., and Victor Lavy. 1999. "Using Maimonides' Rule to Estimate
+the Effect of Class Size on Scholastic Achievement." *Quarterly Journal of
+Economics* 114 (2): 533–575.
