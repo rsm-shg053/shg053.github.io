@@ -15,7 +15,7 @@ execute:
 
 ## Introduction
 
-Imagine that I manage the homepage for a website that invites visitors to sign up for a newsletter. The sign-up box is small, but the words above it matter: a clearer or more persuasive call to action (CTA) could change how many visitors decide to subscribe.
+Imagine that I manage the homepage of a website that invites visitors to sign up for a newsletter. The sign-up box is small, but the words above it matter: a clearer or more persuasive call to action (CTA) could change how many visitors decide to subscribe.
 
 For this experiment, I compare two possible CTAs:
 
@@ -26,7 +26,7 @@ The goal is to learn which version leads to a higher sign-up rate. To do that, I
 
 ## The A/B Test as a Statistical Problem
 
-Each visitor either signs up or does not sign up, so each outcome can be represented as a binary variable:
+Each visitor either signs up or does not sign up, so each outcome can be represented as a binary variable (1 for sign-up and 0 otherwise):
 
 $$
 X_i =
