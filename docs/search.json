@@ -1,24 +1,10 @@
 [
   {
-    "objectID": "index.html",
-    "href": "index.html",
-    "title": "Shengzi Guo(Godwin)",
-    "section": "",
-    "text": "Welcome to my website!"
-  },
-  {
     "objectID": "resume.html",
     "href": "resume.html",
     "title": "My Resume",
     "section": "",
     "text": "Download PDF file."
-  },
-  {
-    "objectID": "projects.html",
-    "href": "projects.html",
-    "title": "My Projects",
-    "section": "",
-    "text": "Replication of Angrist & Lavy (1999)\n\n\n\n\n\n\nGodwin\n\n\nApr 23, 2026\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nNo matching items"
   },
   {
     "objectID": "projects/project2/index.html",
@@ -54,5 +40,33 @@
     "title": "Replication of Angrist & Lavy (1999)",
     "section": "References",
     "text": "References\nAngrist, Joshua D., and Victor Lavy. 1999. “Using Maimonides’ Rule to Estimate the Effect of Class Size on Scholastic Achievement.” Quarterly Journal of Economics 114 (2): 533–575."
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Shengzi Guo(Godwin)",
+    "section": "",
+    "text": "Welcome to my website!"
+  },
+  {
+    "objectID": "projects/project1/index.html",
+    "href": "projects/project1/index.html",
+    "title": "A/B Testing a Call to Action",
+    "section": "",
+    "text": "Imagine that I manage the homepage for a website that invites visitors to sign up for a newsletter. The sign-up box is small, but the words above it matter: a clearer or more persuasive call to action (CTA) could change how many visitors decide to subscribe. For this experiment, I compare two possible CTAs: - CTA A: “Sign up for our newsletter here!” - CTA B: “Stay up to date by signing up!” The goal is to learn which version leads to a higher sign-up rate. To do that, I use an A/B test. In an A/B test, visitors are randomly assigned to see one of two versions of a product, page, or message. Because assignment is random, the two groups should be similar except for the CTA they see. That lets us compare the sign-up rates and interpret the difference as evidence about which CTA performs better. ## The A/B Test as a Statistical Problem Each visitor either signs up or does not sign up, so each outcome can be represented as a binary variable: \\[\nX_i =\n\\begin{cases}\n1 & \\text{if visitor } i \\text{ signs up}\\\\\n0 & \\text{otherwise.}\n\\end{cases}\n\\] A binary outcome like this is naturally modeled as a Bernoulli random variable. If a visitor sees CTA A, let the sign-up probability be \\(\\pi_A\\). If a visitor sees CTA B, let the sign-up probability be \\(\\pi_B\\). The main quantity of interest is the difference in sign-up probabilities: \\[\n\\theta = \\pi_A - \\pi_B.\n\\] If \\(\\theta &gt; 0\\), CTA A performs better. If \\(\\theta &lt; 0\\), CTA B performs better. If \\(\\theta = 0\\), the two CTAs perform equally well. In practice, we estimate this quantity with the difference in sample means: \\[\n\\hat{\\theta} = \\bar{X}_A - \\bar{X}_B.\n\\] Because each observation is either 0 or 1, each sample mean is also a sample proportion. ## Simulating Data In a real A/B test, the true sign-up probabilities would be unknown. For this exercise, however, I set the true values myself so that I can study whether the estimator behaves the way frequentist theory says it should. I assume: \\[\n\\pi_A = 0.22, \\qquad \\pi_B = 0.18.\n\\] So the true effect is: \\[\n\\theta = 0.22 - 0.18 = 0.04.\n\\] That means CTA A is truly better in this simulated world, but only by 4 percentage points.\n\nimport math\nimport numpy as np\nimport pandas as pd\nimport matplotlib.pyplot as plt\npd.options.display.float_format = \"{:.4f}\".format\ndef normal_two_sided_p(z):\n    return math.erfc(abs(z) / math.sqrt(2))\ndef normal_pdf(x, mean, sd):\n    return (1 / (sd * math.sqrt(2 * math.pi))) * np.exp(-0.5 * ((x - mean) / sd) ** 2)\n\nrng = np.random.default_rng(20260429) n = 1000 pi_A = 0.22 pi_B = 0.18 theta_true = pi_A - pi_B cta_a = rng.binomial(1, pi_A, n) cta_b = rng.binomial(1, pi_B, n)"
+  },
+  {
+    "objectID": "projects/project1/index.html#introduction",
+    "href": "projects/project1/index.html#introduction",
+    "title": "A/B Testing a Call to Action",
+    "section": "",
+    "text": "Imagine that I manage the homepage for a website that invites visitors to sign up for a newsletter. The sign-up box is small, but the words above it matter: a clearer or more persuasive call to action (CTA) could change how many visitors decide to subscribe. For this experiment, I compare two possible CTAs: - CTA A: “Sign up for our newsletter here!” - CTA B: “Stay up to date by signing up!” The goal is to learn which version leads to a higher sign-up rate. To do that, I use an A/B test. In an A/B test, visitors are randomly assigned to see one of two versions of a product, page, or message. Because assignment is random, the two groups should be similar except for the CTA they see. That lets us compare the sign-up rates and interpret the difference as evidence about which CTA performs better. ## The A/B Test as a Statistical Problem Each visitor either signs up or does not sign up, so each outcome can be represented as a binary variable: \\[\nX_i =\n\\begin{cases}\n1 & \\text{if visitor } i \\text{ signs up}\\\\\n0 & \\text{otherwise.}\n\\end{cases}\n\\] A binary outcome like this is naturally modeled as a Bernoulli random variable. If a visitor sees CTA A, let the sign-up probability be \\(\\pi_A\\). If a visitor sees CTA B, let the sign-up probability be \\(\\pi_B\\). The main quantity of interest is the difference in sign-up probabilities: \\[\n\\theta = \\pi_A - \\pi_B.\n\\] If \\(\\theta &gt; 0\\), CTA A performs better. If \\(\\theta &lt; 0\\), CTA B performs better. If \\(\\theta = 0\\), the two CTAs perform equally well. In practice, we estimate this quantity with the difference in sample means: \\[\n\\hat{\\theta} = \\bar{X}_A - \\bar{X}_B.\n\\] Because each observation is either 0 or 1, each sample mean is also a sample proportion. ## Simulating Data In a real A/B test, the true sign-up probabilities would be unknown. For this exercise, however, I set the true values myself so that I can study whether the estimator behaves the way frequentist theory says it should. I assume: \\[\n\\pi_A = 0.22, \\qquad \\pi_B = 0.18.\n\\] So the true effect is: \\[\n\\theta = 0.22 - 0.18 = 0.04.\n\\] That means CTA A is truly better in this simulated world, but only by 4 percentage points.\n\nimport math\nimport numpy as np\nimport pandas as pd\nimport matplotlib.pyplot as plt\npd.options.display.float_format = \"{:.4f}\".format\ndef normal_two_sided_p(z):\n    return math.erfc(abs(z) / math.sqrt(2))\ndef normal_pdf(x, mean, sd):\n    return (1 / (sd * math.sqrt(2 * math.pi))) * np.exp(-0.5 * ((x - mean) / sd) ** 2)\n\nrng = np.random.default_rng(20260429) n = 1000 pi_A = 0.22 pi_B = 0.18 theta_true = pi_A - pi_B cta_a = rng.binomial(1, pi_A, n) cta_b = rng.binomial(1, pi_B, n)"
+  },
+  {
+    "objectID": "projects.html",
+    "href": "projects.html",
+    "title": "My Projects",
+    "section": "",
+    "text": "A/B Testing a Call to Action\n\n\n\n\n\n\nGodwin\n\n\nApr 15, 2026\n\n\n\n\n\n\n\n\n\n\n\nReplication of Angrist & Lavy (1999)\n\n\n\n\n\n\nGodwin\n\n\nApr 30, 2026\n\n\n\n\n\n\nNo matching items"
   }
 ]

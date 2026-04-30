@@ -1,0 +1,71 @@
+---
+title: A/B Testing a Call to Action
+subtitle: "Simulating Key Ideas from Classical Frequentist Statistics"
+author: "Godwin"
+date: 2026-04-15
+format:
+  html:
+    toc: true
+    toc-depth: 2
+jupyter: python3
+execute:
+  warning: false
+  message: false
+---
+## Introduction
+Imagine that I manage the homepage for a website that invites visitors to sign up for a newsletter. The sign-up box is small, but the words above it matter: a clearer or more persuasive call to action (CTA) could change how many visitors decide to subscribe.
+For this experiment, I compare two possible CTAs:
+- CTA A: "Sign up for our newsletter here!"
+- CTA B: "Stay up to date by signing up!"
+The goal is to learn which version leads to a higher sign-up rate. To do that, I use an A/B test. In an A/B test, visitors are randomly assigned to see one of two versions of a product, page, or message. Because assignment is random, the two groups should be similar except for the CTA they see. That lets us compare the sign-up rates and interpret the difference as evidence about which CTA performs better.
+## The A/B Test as a Statistical Problem
+Each visitor either signs up or does not sign up, so each outcome can be represented as a binary variable:
+$$
+X_i =
+\begin{cases}
+1 & \text{if visitor } i \text{ signs up}\\
+0 & \text{otherwise.}
+\end{cases}
+$$
+A binary outcome like this is naturally modeled as a Bernoulli random variable. If a visitor sees CTA A, let the sign-up probability be $\pi_A$. If a visitor sees CTA B, let the sign-up probability be $\pi_B$.
+The main quantity of interest is the difference in sign-up probabilities:
+$$
+\theta = \pi_A - \pi_B.
+$$
+If $\theta > 0$, CTA A performs better. If $\theta < 0$, CTA B performs better. If $\theta = 0$, the two CTAs perform equally well. In practice, we estimate this quantity with the difference in sample means:
+$$
+\hat{\theta} = \bar{X}_A - \bar{X}_B.
+$$
+Because each observation is either 0 or 1, each sample mean is also a sample proportion.
+## Simulating Data
+In a real A/B test, the true sign-up probabilities would be unknown. For this exercise, however, I set the true values myself so that I can study whether the estimator behaves the way frequentist theory says it should.
+I assume:
+$$
+\pi_A = 0.22, \qquad \pi_B = 0.18.
+$$
+So the true effect is:
+$$
+\theta = 0.22 - 0.18 = 0.04.
+$$
+That means CTA A is truly better in this simulated world, but only by 4 percentage points.
+```{python}
+#| label: setup
+import math
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+pd.options.display.float_format = "{:.4f}".format
+def normal_two_sided_p(z):
+    return math.erfc(abs(z) / math.sqrt(2))
+def normal_pdf(x, mean, sd):
+    return (1 / (sd * math.sqrt(2 * math.pi))) * np.exp(-0.5 * ((x - mean) / sd) ** 2)
+```
+```{python}
+#| label: simulate-data
+rng = np.random.default_rng(20260429)
+n = 1000
+pi_A = 0.22
+pi_B = 0.18
+theta_true = pi_A - pi_B
+cta_a = rng.binomial(1, pi_A, n)
+cta_b = rng.binomial(1, pi_B, n)
